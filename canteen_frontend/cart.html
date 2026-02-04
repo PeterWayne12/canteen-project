@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cart - Automated Canteen</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- NAVBAR -->
+  <header class="bg-white shadow-md">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <span class="text-xl font-bold text-blue-600">Automated Canteen</span>
+        <span class="text-xs text-gray-500">Cart</span>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <span class="text-sm text-gray-700">
+          User: <span id="userName" class="font-semibold">User</span>
+        </span>
+        <button id="menuBtn"
+          class="text-sm bg-gray-100 border px-3 py-1 rounded hover:bg-gray-200">
+          Back to Menu
+        </button>
+        <button id="logoutBtn"
+          class="text-sm bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="max-w-4xl mx-auto px-4 py-6">
+    <h2 class="text-xl font-semibold mb-4">Your Cart</h2>
+
+    <div id="emptyMsg" class="hidden text-sm text-gray-600 bg-white border rounded p-4">
+      Your cart is empty.
+      <button id="goToMenu" class="text-blue-600 underline ml-1">Go to menu</button>
+    </div>
+
+    <div id="cartContainer" class="bg-white rounded-lg shadow p-4 hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b">
+              <th class="text-left py-2">Item</th>
+              <th class="text-center py-2">Qty</th>
+              <th class="text-right py-2">Price</th>
+              <th class="text-right py-2">Total</th>
+              <th class="text-center py-2">Action</th>
+            </tr>
+          </thead>
+          <tbody id="cartBody"></tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 flex justify-between items-center">
+        <div class="text-sm text-gray-600">
+          Total Items: <span id="totalItems">0</span>
+        </div>
+        <div class="text-lg font-bold">
+          Grand Total: ₹<span id="grandTotal">0</span>
+        </div>
+      </div>
+
+      <!-- PAYMENT METHOD -->
+      <div class="mt-4">
+        <label class="block text-sm font-medium mb-1">Payment Method</label>
+        <select id="paymentMethod" class="border rounded px-3 py-2 w-full">
+          <option value="COD">Cash on Delivery</option>
+          <option value="UPI">UPI</option>
+        </select>
+      </div>
+
+      <div class="mt-4 flex justify-end gap-3">
+        <button id="clearCartBtn"
+          class="text-sm border px-4 py-2 rounded hover:bg-gray-100">
+          Clear Cart
+        </button>
+        <button id="placeOrderBtn"
+          class="text-sm bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+          Place Order
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // ---------- AUTH CHECK ----------
+    const savedUser = JSON.parse(localStorage.getItem("canteenUser"));
+    if (!savedUser || savedUser.role !== "user") {
+      window.location.href = "login.html";
+    }
+    document.getElementById("userName").textContent = savedUser.name || "User";
+
+    // ---------- CART STORAGE ----------
+    function loadCart() {
+      return JSON.parse(localStorage.getItem("canteenCart") || "[]");
+    }
+
+    function saveCart(cart) {
+      localStorage.setItem("canteenCart", JSON.stringify(cart));
+    }
+
+    function renderCart() {
+      const cart = loadCart();
+      const emptyMsg = document.getElementById("emptyMsg");
+      const container = document.getElementById("cartContainer");
+      const tbody = document.getElementById("cartBody");
+      const totalItemsElem = document.getElementById("totalItems");
+      const grandTotalElem = document.getElementById("grandTotal");
+
+      if (cart.length === 0) {
+        emptyMsg.classList.remove("hidden");
+        container.classList.add("hidden");
+        return;
+      } else {
+        emptyMsg.classList.add("hidden");
+        container.classList.remove("hidden");
+      }
+
+      tbody.innerHTML = "";
+      let totalItems = 0;
+      let grandTotal = 0;
+
+      cart.forEach((item, index) => {
+        const row = document.createElement("tr");
+        row.className = "border-b";
+
+        const lineTotal = item.price * item.qty;
+        totalItems += item.qty;
+        grandTotal += lineTotal;
+
+        row.innerHTML = `
+          <td class="py-2">${item.name}</td>
+          <td class="py-2 text-center">
+            <input type="number" min="1" value="${item.qty}"
+              class="w-16 border rounded px-1 py-0.5 text-center qtyInput"
+              data-index="${index}" />
+          </td>
+          <td class="py-2 text-right">₹${item.price}</td>
+          <td class="py-2 text-right">₹${lineTotal}</td>
+          <td class="py-2 text-center">
+            <button class="text-red-600 text-xs underline removeBtn" data-index="${index}">
+              Remove
+            </button>
+          </td>
+        `;
+
+        tbody.appendChild(row);
+      });
+
+      totalItemsElem.textContent = totalItems;
+      grandTotalElem.textContent = grandTotal.toFixed(2);
+
+      // qty change
+      document.querySelectorAll(".qtyInput").forEach(input => {
+        input.addEventListener("change", () => {
+          const idx = parseInt(input.getAttribute("data-index"));
+          const newQty = parseInt(input.value) || 1;
+          cart[idx].qty = newQty < 1 ? 1 : newQty;
+          saveCart(cart);
+          renderCart();
+        });
+      });
+
+      // remove item
+      document.querySelectorAll(".removeBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.getAttribute("data-index"));
+          cart.splice(idx, 1);
+          saveCart(cart);
+          renderCart();
+        });
+      });
+    }
+
+    // ---------- PLACE ORDER (CALL BACKEND) ----------
+  
+  function placeOrder() {
+  const cart = loadCart();
+  if (cart.length === 0) {
+    alert("Cart is empty!");
+    return;
+  }
+
+  const payload = {
+    userEmail: savedUser.email,
+    items: cart.map(it => ({
+      id: it.id,
+      qty: it.qty
+    }))
+  };
+
+  fetch("http://127.0.0.1:5000/api/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        alert("Error placing order");
+        return;
+      }
+
+      saveCart([]);
+      alert("Order placed successfully! Order ID: " + data.orderId);
+      window.location.href = "myorders.html";
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Could not place order. Is backend running?");
+    });
+  }
+
+
+    // ---------- NAV / BUTTON HANDLERS ----------
+    document.getElementById("menuBtn").addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+
+    document.getElementById("goToMenu").addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      if (confirm("Logout from this account?")) {
+        window.location.href = "login.html";
+      }
+    });
+
+    document.getElementById("clearCartBtn").addEventListener("click", () => {
+      if (confirm("Clear all items from cart?")) {
+        saveCart([]);
+        renderCart();
+      }
+    });
+
+    document.getElementById("placeOrderBtn").addEventListener("click", placeOrder);
+
+    // ---------- INITIAL ----------
+    renderCart();
+  </script>
+
+</body>
+</html>

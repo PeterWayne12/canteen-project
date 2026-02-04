@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canteen - Home / Menu</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- NAVBAR -->
+  <header class="bg-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <span class="text-xl font-bold text-blue-600">Automated Canteen</span>
+        <span class="text-xs text-gray-500">User Panel</span>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <div class="text-sm text-gray-700">
+          Welcome, <span id="userName" class="font-semibold">User</span>
+        </div>
+
+        <button id="cartBtn" class="relative border px-3 py-1 rounded text-sm">
+          Cart
+          <span id="cartCount"
+                class="ml-1 inline-flex items-center justify-center text-xs bg-blue-600 text-white rounded-full w-5 h-5">
+            0
+          </span>
+        </button>
+
+        <button id="myOrdersBtn"
+          class="text-sm bg-gray-100 border px-3 py-1 rounded hover:bg-gray-200">
+          My Orders
+        </button>
+
+        <button id="logoutBtn"
+          class="text-sm bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold">Menu</h2>
+
+      <div class="flex gap-2 text-sm">
+        <button class="filterBtn px-3 py-1 border rounded" data-filter="all">All</button>
+        <button class="filterBtn px-3 py-1 border rounded" data-filter="Snacks">Snacks</button>
+        <button class="filterBtn px-3 py-1 border rounded" data-filter="Meals">Meals</button>
+        <button class="filterBtn px-3 py-1 border rounded" data-filter="Beverages">Beverages</button>
+      </div>
+    </div>
+
+    <!-- ERROR MESSAGE -->
+    <div id="errorBox" class="hidden mb-4 bg-red-100 text-red-700 text-sm px-4 py-2 rounded">
+      Could not load menu from server.
+    </div>
+
+    <!-- MENU GRID -->
+    <div id="menuGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <!-- items will be injected by JS -->
+    </div>
+  </main>
+
+  <!-- SMALL MESSAGE TOAST -->
+  <div id="toast"
+       class="hidden fixed bottom-4 right-4 bg-black text-white text-sm px-4 py-2 rounded-lg opacity-90">
+    Item added to cart
+  </div>
+
+  <script>
+  // --------- AUTH CHECK ---------
+  const savedUser = JSON.parse(localStorage.getItem("canteenUser"));
+  if (!savedUser || savedUser.role !== "user") {
+    window.location.href = "login.html";
+  }
+  document.getElementById("userName").textContent = savedUser.name || "User";
+
+  // --------- MENU DATA ---------
+  let menuItems = [];
+
+  function fetchMenu() {
+    const errorBox = document.getElementById("errorBox");
+    errorBox.classList.add("hidden");
+
+    fetch("http://127.0.0.1:5000/api/menu")
+      .then(res => res.json())
+      .then(data => {
+        // backend returns { items: [...] }
+        menuItems = data.items || [];
+        renderMenu("all");
+      })
+      .catch(err => {
+        console.error(err);
+        errorBox.classList.remove("hidden");
+        document.getElementById("menuGrid").innerHTML =
+          "<p class='text-sm text-gray-600'>Backend not reachable.</p>";
+      });
+  }
+
+  // --------- CART ---------
+  function loadCart() {
+    return JSON.parse(localStorage.getItem("canteenCart") || "[]");
+  }
+
+  function saveCart(cart) {
+    localStorage.setItem("canteenCart", JSON.stringify(cart));
+  }
+
+  function updateCartCount() {
+    const cart = loadCart();
+    const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+    document.getElementById("cartCount").textContent = totalQty;
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById("toast");
+    toast.textContent = msg;
+    toast.classList.remove("hidden");
+    setTimeout(() => toast.classList.add("hidden"), 1500);
+  }
+
+  function addToCart(itemId) {
+  let cart = loadCart();
+  const existing = cart.find(c => c.id === itemId);
+
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    const item = menuItems.find(m => m.id === itemId);
+    if (!item) return;
+
+    cart.push({
+      id: item.id,          // ✅ DB ID (number)
+      name: item.name,
+      price: item.price,
+      qty: 1
+    });
+  }
+
+  saveCart(cart);
+  updateCartCount();
+}
+
+  // --------- RENDER MENU ---------
+  function renderMenu(filter = "all") {
+    const container = document.getElementById("menuGrid");
+    container.innerHTML = "";
+
+    const filtered = menuItems.filter(item =>
+      filter === "all" ? true : item.category === filter
+    );
+
+    if (filtered.length === 0) {
+      container.innerHTML =
+        "<p class='text-sm text-gray-600'>No items available.</p>";
+      return;
+    }
+
+    filtered.forEach(item => {
+      const card = document.createElement("div");
+      card.className =
+        "bg-white rounded-lg shadow p-4 flex flex-col justify-between";
+
+      const descText =
+        item.desc && item.desc.trim() !== ""
+          ? item.desc
+          : "Tasty and fresh.";
+
+      card.innerHTML = `
+        <div>
+          <h3 class="text-lg font-semibold">${item.name}</h3>
+          <p class="text-xs text-gray-500 mt-1">${item.category}</p>
+          <p class="text-sm text-gray-600 mt-2">${descText}</p>
+        </div>
+        <div class="mt-4 flex items-center justify-between">
+          <span class="font-bold">₹${item.price}</span>
+          <button
+            class="addBtn bg-blue-600 text-white text-sm px-3 py-1 rounded hover:bg-blue-700"
+            data-id="${item.id}">
+            Add to Cart
+          </button>
+        </div>
+      `;
+
+      container.appendChild(card);
+    });
+
+    document.querySelectorAll(".addBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        addToCart(parseInt(btn.dataset.id));
+      });
+    });
+  }
+
+  // --------- FILTERS ---------
+  document.querySelectorAll(".filterBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      renderMenu(btn.dataset.filter);
+    });
+  });
+
+  // --------- NAV ---------
+  document.getElementById("cartBtn").onclick = () =>
+    window.location.href = "cart.html";
+
+  document.getElementById("myOrdersBtn").onclick = () =>
+    window.location.href = "myorders.html";
+
+  document.getElementById("logoutBtn").onclick = () => {
+    if (confirm("Logout from this account?")) {
+      window.location.href = "login.html";
+    }
+  };
+
+  // --------- INIT ---------
+  fetchMenu();
+  updateCartCount();
+</script>
+
+
+</body>
+</html>

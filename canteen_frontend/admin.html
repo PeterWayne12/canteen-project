@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel - Automated Canteen</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- NAVBAR -->
+  <header class="bg-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <span class="text-xl font-bold text-blue-600">Automated Canteen</span>
+        <span class="text-xs text-gray-500">Admin Panel</span>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <div class="text-sm text-gray-700">
+          Admin: <span id="adminName" class="font-semibold">Admin</span>
+        </div>
+
+        <button id="logoutBtn"
+          class="text-sm bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="max-w-6xl mx-auto px-4 py-6">
+
+    <!-- TABS -->
+    <div class="flex gap-4 mb-6 text-sm">
+      <button class="tabBtn bg-blue-600 text-white px-4 py-2 rounded" data-page="menuPage">
+        Menu Management
+      </button>
+    </div>
+
+    <!-- MENU PAGE -->
+    <section id="menuPage">
+      <h2 class="text-xl font-semibold mb-4">Manage Menu</h2>
+
+      <!-- ADD / EDIT FORM -->
+      <div class="bg-white rounded-lg shadow p-4 mb-6">
+        <h3 class="font-semibold mb-3">Add / Update Item</h3>
+
+        <form id="menuForm" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input id="foodName" class="border p-2 rounded" placeholder="Food Name" required>
+          <input id="foodCategory" class="border p-2 rounded" placeholder="Category (Snacks/Meals/Beverages)" required>
+          <input id="foodPrice" class="border p-2 rounded" placeholder="Price" type="number" required>
+          <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">
+            Save
+          </button>
+        </form>
+
+        <textarea id="foodDesc" class="border p-2 rounded w-full mt-3" rows="2"
+          placeholder="Description (optional)"></textarea>
+      </div>
+
+      <!-- MENU LIST -->
+      <div class="bg-white rounded-lg shadow p-4">
+        <h3 class="font-semibold mb-3">Menu Items</h3>
+
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b">
+              <th class="text-left py-2">Name</th>
+              <th class="text-left py-2">Category</th>
+              <th class="text-left py-2">Price</th>
+              <th class="py-2 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="menuBody">
+            <!-- rows go here -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // ---- AUTH CHECK ----
+    const adminUser = JSON.parse(localStorage.getItem("canteenUser"));
+    if (!adminUser || adminUser.role !== "admin") {
+      window.location.href = "login.html";
+    }
+    document.getElementById("adminName").textContent = adminUser.name || "Admin";
+
+    // ---- MENU FUNCTIONS ----
+    function renderMenuList() {
+      fetch("http://127.0.0.1:5000/api/admin/menu")
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) {
+            alert("Error loading menu: " + (data.message || ""));
+            return;
+          }
+
+          const menu = data.items;
+          const tbody = document.getElementById("menuBody");
+          tbody.innerHTML = "";
+
+          if (menu.length === 0) {
+            tbody.innerHTML = "<tr><td colspan='4' class='py-3 text-center text-gray-500'>No items in menu.</td></tr>";
+            return;
+          }
+
+          menu.forEach(item => {
+            const row = document.createElement("tr");
+            row.className = "border-b";
+
+            row.innerHTML = `
+              <td class="py-2">${item.name}</td>
+              <td class="py-2">${item.category}</td>
+              <td class="py-2">₹${item.price}</td>
+              <td class="py-2 text-center">
+                <button class="editBtn text-blue-600 underline text-xs" data-id="${item.id}">
+                  Edit
+                </button>
+                <button class="deleteBtn text-red-600 underline text-xs ml-2" data-id="${item.id}">
+                  Delete
+                </button>
+              </td>
+            `;
+
+            tbody.appendChild(row);
+          });
+
+          document.querySelectorAll(".editBtn").forEach(btn => {
+            btn.addEventListener("click", () => {
+              const id = btn.getAttribute("data-id");
+              loadItemToForm(id);
+            });
+          });
+
+          document.querySelectorAll(".deleteBtn").forEach(btn => {
+            btn.addEventListener("click", () => {
+              const id = btn.getAttribute("data-id");
+              deleteItem(id);
+            });
+          });
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Could not load menu from backend");
+        });
+    }
+
+    function loadItemToForm(id) {
+      fetch("http://127.0.0.1:5000/api/admin/menu")
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) return;
+          const item = data.items.find(it => String(it.id) === String(id));
+          if (!item) return;
+
+          document.getElementById("foodName").value = item.name;
+          document.getElementById("foodCategory").value = item.category;
+          document.getElementById("foodPrice").value = item.price;
+          document.getElementById("foodDesc").value = item.desc || "";
+          document.getElementById("menuForm").setAttribute("data-edit", item.id);
+        });
+    }
+
+    function deleteItem(id) {
+      if (!confirm("Delete this item?")) return;
+
+      fetch("http://127.0.0.1:5000/api/admin/menu/" + id, {
+        method: "DELETE"
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) {
+            alert("Error deleting item: " + (data.message || ""));
+            return;
+          }
+          renderMenuList();
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Could not delete item");
+        });
+    }
+
+    document.getElementById("menuForm").addEventListener("submit", e => {
+      e.preventDefault();
+
+      const name = document.getElementById("foodName").value.trim();
+      const category = document.getElementById("foodCategory").value.trim();
+      const price = Number(document.getElementById("foodPrice").value.trim());
+      const desc = document.getElementById("foodDesc").value.trim();
+      const editId = document.getElementById("menuForm").getAttribute("data-edit");
+
+      if (!name || !category || !price) {
+        alert("Please fill all required fields.");
+        return;
+      }
+
+      const payload = { name, category, price, desc };
+
+      if (editId) {
+        // update existing
+        fetch("http://127.0.0.1:5000/api/admin/menu/" + editId, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (!data.success) {
+              alert("Error updating item: " + (data.message || ""));
+              return;
+            }
+            document.getElementById("menuForm").removeAttribute("data-edit");
+            document.getElementById("menuForm").reset();
+            document.getElementById("foodDesc").value = "";
+            renderMenuList();
+          })
+          .catch(err => {
+            console.error(err);
+            alert("Could not update item");
+          });
+      } else {
+        // create new
+        fetch("http://127.0.0.1:5000/api/admin/menu", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (!data.success) {
+              alert("Error adding item: " + (data.message || ""));
+              return;
+            }
+            document.getElementById("menuForm").reset();
+            document.getElementById("foodDesc").value = "";
+            renderMenuList();
+          })
+          .catch(err => {
+            console.error(err);
+            alert("Could not add item");
+          });
+      }
+    });
+
+    // ---- LOGOUT ----
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      if (confirm("Logout admin?")) {
+        window.location.href = "login.html";
+      }
+    });
+
+    // ---- INIT ----
+    renderMenuList();
+  </script>
+
+</body>
+</html>

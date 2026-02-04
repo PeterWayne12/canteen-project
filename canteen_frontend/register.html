@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Registration</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 flex justify-center items-center min-h-screen">
+
+  <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-md">
+    <h2 class="text-2xl font-bold mb-4 text-center">Create an Account</h2>
+
+    <!-- REGISTRATION FORM -->
+    <form id="regForm" class="space-y-4">
+
+      <div>
+        <label class="block text-sm font-medium">Full Name</label>
+        <input id="fullname" type="text" required
+          class="mt-1 block w-full border px-3 py-2 rounded" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium">Email</label>
+        <input id="email" type="email" required
+          class="mt-1 block w-full border px-3 py-2 rounded" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium">Password</label>
+        <input id="password" type="password" required
+          class="mt-1 block w-full border px-3 py-2 rounded" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium">Confirm Password</label>
+        <input id="confirmPass" type="password" required
+          class="mt-1 block w-full border px-3 py-2 rounded" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium">Select Role</label>
+        <select id="role"
+          class="mt-1 block w-full border px-3 py-2 rounded">
+          <option value="user">User</option>
+          <option value="staff">Staff</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+
+      <button type="submit"
+        class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+        Register
+      </button>
+
+      <p class="text-center text-sm mt-2">
+        Already have an account?
+        <a href="login.html" class="text-blue-600 underline">Login</a>
+      </p>
+    </form>
+  </div>
+
+  <!-- SCRIPT SECTION -->
+  <script>
+    document.getElementById("regForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const name = document.getElementById("fullname").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const pass = document.getElementById("password").value.trim();
+      const confirm = document.getElementById("confirmPass").value.trim();
+      const role = document.getElementById("role").value;
+
+      if (!name || !email || !pass || !confirm) {
+        alert("Please fill all fields.");
+        return;
+      }
+
+      if (pass !== confirm) {
+        alert("Passwords do not match!");
+        return;
+      }
+
+      fetch("http://127.0.0.1:5000/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name,
+          email: email,
+          password: pass,
+          role: role
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            alert("Registration successful! Please login.");
+            window.location.href = "login.html";
+          } else {
+            alert("Error: " + data.message);
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Backend not running! Start Flask with:  py app.py");
+        });
+    });
+  </script>
+
+</body>
+</html>
